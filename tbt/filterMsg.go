@@ -34,9 +34,6 @@ func NewFilterMessage(timeFilter, timeClean time.Duration) *filterMessage {
 }
 
 func (f *filterMessage) Handle(ctx *Context) bool {
-	if f.timeclean == 0 {
-		return true
-	}
 	f.rwmut.RLock()
 	defer f.rwmut.RUnlock()
 	msg := ctx.GetUpdate().Message
@@ -44,7 +41,7 @@ func (f *filterMessage) Handle(ctx *Context) bool {
 		defer func() { go f.cleanup() }()
 		id := ctx.GetUpdate().Message.From.ID
 		lastmsg, ok := f.messages[id]
-		if ok && lastmsg.lastMsg == msg.Text && lastmsg.lastTime.Add(time.Second*f.timefilter).After(time.Now()) {
+		if ok && lastmsg.lastMsg == msg.Text && (lastmsg.lastTime.Add(time.Second*f.timefilter).After(time.Now()) || f.timefilter == 0) {
 			f.messages[id].lastTime = time.Now()
 			return true
 		} else {
