@@ -30,6 +30,9 @@ func (c *Context) GetBotApi() *tbot.BotAPI {
 
 func (c *Context) NewMessage(txt string) *tbot.MessageConfig {
 	msg := tbot.NewMessage(c.upd.Message.Chat.ID, txt)
+	msg.DisableNotification = true
+	msg.DisableWebPagePreview = true
+	msg.ParseMode = tbot.ModeHTML
 	return &msg
 }
 
@@ -66,11 +69,7 @@ func (c *Context) GetParam(name string) interface{} {
 
 func (c *Context) ResponseMessage() *tbot.MessageConfig {
 	if _, ok := c.msg.(*tbot.MessageConfig); ok || c.msg == nil {
-		msg := c.NewMessage("")
-		msg.DisableNotification = true
-		msg.DisableWebPagePreview = true
-		msg.ParseMode = tbot.ModeHTML
-		c.msg = msg
+		c.msg = c.NewMessage("")
 	}
 	return c.msg.(*tbot.MessageConfig)
 }
