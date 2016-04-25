@@ -1,6 +1,7 @@
 package tbt
 
 import (
+	"reflect"
 	"strings"
 
 	tbot "github.com/go-telegram-bot-api/telegram-bot-api"
@@ -134,6 +135,24 @@ func (r *Routes) GetRoutes() map[string]Route {
 
 func invokeHandle(ctx *Context, route Route) bool {
 	upd := ctx.GetUpdate()
+
+	//Command handlers
+	if upd.Message != nil && upd.Message.Command() != "" {
+		type temper interface {
+			OnCommand(*Context, string, string) bool
+		}
+		if hndl, ok := route.(temper); ok {
+			//general function exist
+			return hndl.OnCommand(ctx, upd.Message.Command(), upd.Message.CommandArguments())
+		} else {
+			//find on__cmds__ in handler
+			cmd := upd.Message.Command()
+			if mth := findCmdMethod(ctx, route, cmd); mth != nil {
+				return mth.Func.Call([]reflect.Value{reflect.ValueOf(route), reflect.ValueOf(ctx), reflect.ValueOf(upd.Message.Command()), reflect.ValueOf(upd.Message.CommandArguments())})[0].Bool()
+			}
+		}
+	}
+
 	if upd.CallbackQuery != nil {
 		type temper interface {
 			OnCallbackQuery(*Context, *tbot.CallbackQuery) bool
@@ -170,4 +189,29 @@ func invokeHandle(ctx *Context, route Route) bool {
 		}
 	}
 	return route.Handle(ctx)
+}
+
+// OnHelp(ctx *Context, cmd, arg string) bool
+func findCmdMethod(ctx *Context, str interface{}, methodName string) *reflect.Method {
+	mth := getMethodByName(str, methodName)
+	if mth != nil && mth.Type.NumIn() == 4 {
+		if (mth.Type.In(1).Kind() == reflect.Ptr && mth.Type.In(1) == reflect.ValueOf(ctx).Type()) &&
+			(mth.Type.In(2).Kind() == reflect.String && mth.Type.In(3).Kind() == reflect.String) {
+			return mth
+		}
+	}
+	return nil
+}
+
+func getMethodByName(str interface{}, methodName string) *reflect.Method {
+	stType := reflect.TypeOf(str)
+	methodName = "on" + strings.ToLower(methodName)
+	for i := 0; i < stType.NumMethod(); i++ {
+		if mth := stType.Method(i); strings.HasPrefix(mth.Name, "On") && strings.ToLower(mth.Name) == methodName {
+			if mth.Type.NumOut() == 1 && mth.Type.Out(0).Kind() == reflect.Bool {
+				return &mth
+			}
+		}
+	}
+	return nil
 }
